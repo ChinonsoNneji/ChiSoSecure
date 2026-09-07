@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
+
 from backend.app.database import Base
 
 
@@ -11,6 +13,12 @@ class SecurityEventModel(Base):
     severity = Column(String, nullable=False)
     description = Column(String, nullable=False)
 
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
 
 class AlertModel(Base):
     __tablename__ = "alerts"
@@ -20,3 +28,9 @@ class AlertModel(Base):
     rule_name = Column(String, nullable=False)
     severity = Column(String, nullable=False)
     message = Column(String, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )

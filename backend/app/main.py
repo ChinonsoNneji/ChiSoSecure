@@ -9,11 +9,16 @@ from backend.app.detection import analyze_event
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(
+    title="ChiSoSecure API",
+    description="Security event detection and automated incident response platform.",
+    version="0.1.0"
+)
 
 
 def get_db():
     db = SessionLocal()
+
     try:
         yield db
     finally:
@@ -40,6 +45,7 @@ def create_event(
     event: SecurityEvent,
     db: Session = Depends(get_db)
 ):
+    # Store incoming security event
     db_event = models.SecurityEventModel(
         source_ip=event.source_ip,
         event_type=event.event_type,
@@ -51,10 +57,14 @@ def create_event(
     db.commit()
     db.refresh(db_event)
 
-    detected_alerts = analyze_event(event)
+    # Analyze the event.
+    # We pass the database session so detection rules
+    # can examine previously stored events.
+    detected_alerts = analyze_event(db_event, db)
 
     stored_alerts = []
 
+    # Store generated alerts
     for alert in detected_alerts:
         db_alert = models.AlertModel(
             event_id=db_event.id,
@@ -78,7 +88,12 @@ def create_event(
     return {
         "message": "Security event stored and analyzed",
         "event_id": db_event.id,
-        "event": event,
+        "event": {
+            "source_ip": db_event.source_ip,
+            "event_type": db_event.event_type,
+            "severity": db_event.severity,
+            "description": db_event.description
+        },
         "alerts_generated": len(stored_alerts),
         "alerts": stored_alerts
     }
