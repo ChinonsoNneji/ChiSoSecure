@@ -4,13 +4,17 @@ from backend.app import models
 from backend.app.database import Base, engine
 from backend.app.routers import (
     alerts,
+    auth,
     events,
     incidents,
     response_actions,
+    users,
 )
 
 
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(
+    bind=engine
+)
 
 
 app = FastAPI(
@@ -19,9 +23,17 @@ app = FastAPI(
         "Cloud-native security detection and "
         "automated incident response platform."
     ),
-    version="0.6.0"
+    version="0.7.0"
 )
 
+
+app.include_router(
+    auth.router
+)
+
+app.include_router(
+    users.router
+)
 
 app.include_router(
     events.router
@@ -48,7 +60,7 @@ def root():
     return {
         "service": "ChiSoSecure",
         "status": "operational",
-        "version": "0.6.0"
+        "version": "0.7.0"
     }
 
 

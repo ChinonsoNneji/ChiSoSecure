@@ -1,8 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+)
 from sqlalchemy.orm import Session
 
 from backend.app import models
 from backend.app.dependencies import get_db
+from backend.app.security import (
+    require_roles,
+)
 
 
 router = APIRouter(
@@ -13,7 +20,14 @@ router = APIRouter(
 
 @router.get("")
 def get_alerts(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst",
+            "viewer"
+        )
+    )
 ):
     alerts = (
         db.query(
@@ -34,7 +48,14 @@ def get_alerts(
 @router.get("/{alert_id}")
 def get_alert(
     alert_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst",
+            "viewer"
+        )
+    )
 ):
     alert = (
         db.query(

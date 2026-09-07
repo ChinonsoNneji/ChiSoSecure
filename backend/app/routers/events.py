@@ -1,10 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+)
 from sqlalchemy.orm import Session
 
 from backend.app import models
 from backend.app.dependencies import get_db
 from backend.app.detection import analyze_event
 from backend.app.schemas import SecurityEvent
+from backend.app.security import (
+    require_roles,
+)
 from backend.app.services.incident_service import (
     create_automatic_incident,
 )
@@ -19,7 +26,13 @@ router = APIRouter(
 @router.post("")
 def create_event(
     event: SecurityEvent,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst"
+        )
+    )
 ):
     db_event = models.SecurityEventModel(
         source_ip=event.source_ip,
@@ -98,7 +111,14 @@ def create_event(
 
 @router.get("")
 def get_events(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst",
+            "viewer"
+        )
+    )
 ):
     events = (
         db.query(
@@ -119,7 +139,14 @@ def get_events(
 @router.get("/{event_id}")
 def get_event(
     event_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst",
+            "viewer"
+        )
+    )
 ):
     event = (
         db.query(
