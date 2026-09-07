@@ -118,3 +118,44 @@ class IncidentModel(Base):
         onupdate=func.now(),
         nullable=False
     )
+
+class ResponseActionModel(Base):
+    __tablename__ = "response_actions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    incident_id = Column(
+        Integer,
+        nullable=False
+    )
+
+    action_type = Column(
+        String,
+        nullable=False
+    )
+
+    target = Column(
+        String,
+        nullable=False
+    )
+
+    status = Column(
+        String,
+        nullable=False,
+        default="completed"
+    )
+
+    result = Column(
+        String,
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )

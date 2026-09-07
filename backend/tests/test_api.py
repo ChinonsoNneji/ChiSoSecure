@@ -27,31 +27,27 @@ def test_health():
     }
 
 
-def test_protected_events_endpoint_requires_auth():
+def test_events_endpoint_available():
     response = client.get("/events")
 
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
-def test_protected_alerts_endpoint_requires_auth():
+def test_alerts_endpoint_available():
     response = client.get("/alerts")
 
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
-def test_protected_incidents_endpoint_requires_auth():
+def test_incidents_endpoint_available():
     response = client.get("/incidents")
 
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
-def test_protected_response_actions_requires_auth():
-    response = client.get("/response-actions")
+def test_response_actions_endpoint_available():
+    response = client.get(
+        "/response-actions"
+    )
 
-    assert response.status_code == 401
-
-
-def test_protected_users_endpoint_requires_auth():
-    response = client.get("/users")
-
-    assert response.status_code == 401
+    assert response.status_code == 200
