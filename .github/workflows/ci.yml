@@ -34,6 +34,7 @@ jobs:
     env:
       CHISOSECURE_SECRET_KEY: github-actions-test-secret
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/chisosecure
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout repository
@@ -51,4 +52,4 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest backend/tests -v
+          python -m pytest backend/tests -v
