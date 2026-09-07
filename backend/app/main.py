@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from backend.app.schemas import SecurityEvent
 from backend.app.database import Base, engine, SessionLocal
 from backend.app import models
+from backend.app.detection import analyze_event
 
 
 Base.metadata.create_all(bind=engine)
@@ -50,10 +51,36 @@ def create_event(
     db.commit()
     db.refresh(db_event)
 
+    detected_alerts = analyze_event(event)
+
+    stored_alerts = []
+
+    for alert in detected_alerts:
+        db_alert = models.AlertModel(
+            event_id=db_event.id,
+            rule_name=alert["rule_name"],
+            severity=alert["severity"],
+            message=alert["message"]
+        )
+
+        db.add(db_alert)
+        db.commit()
+        db.refresh(db_alert)
+
+        stored_alerts.append({
+            "id": db_alert.id,
+            "event_id": db_alert.event_id,
+            "rule_name": db_alert.rule_name,
+            "severity": db_alert.severity,
+            "message": db_alert.message
+        })
+
     return {
-        "message": "Security event stored",
+        "message": "Security event stored and analyzed",
         "event_id": db_event.id,
-        "event": event
+        "event": event,
+        "alerts_generated": len(stored_alerts),
+        "alerts": stored_alerts
     }
 
 
@@ -64,4 +91,14 @@ def get_events(db: Session = Depends(get_db)):
     return {
         "count": len(events),
         "events": events
+    }
+
+
+@app.get("/alerts")
+def get_alerts(db: Session = Depends(get_db)):
+    alerts = db.query(models.AlertModel).all()
+
+    return {
+        "count": len(alerts),
+        "alerts": alerts
     }
