@@ -20,7 +20,7 @@ app = FastAPI(
         "Cloud-native security detection and "
         "incident response platform."
     ),
-    version="0.3.0"
+    version="0.4.0"
 )
 
 
@@ -34,12 +34,48 @@ def get_db():
         db.close()
 
 
+def create_automatic_incident(
+    alert,
+    db: Session
+):
+    if alert.severity not in {
+        "high",
+        "critical"
+    }:
+        return None
+
+    existing_incident = (
+        db.query(models.IncidentModel)
+        .filter(
+            models.IncidentModel.alert_id
+            == alert.id
+        )
+        .first()
+    )
+
+    if existing_incident:
+        return existing_incident
+
+    incident = models.IncidentModel(
+        alert_id=alert.id,
+        title=alert.rule_name,
+        severity=alert.severity,
+        status="open"
+    )
+
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    return incident
+
+
 @app.get("/")
 def root():
     return {
         "service": "ChiSoSecure",
         "status": "operational",
-        "version": "0.3.0"
+        "version": "0.4.0"
     }
 
 
@@ -59,7 +95,6 @@ def create_event(
     event: SecurityEvent,
     db: Session = Depends(get_db)
 ):
-
     db_event = models.SecurityEventModel(
         source_ip=event.source_ip,
         event_type=event.event_type,
@@ -77,9 +112,9 @@ def create_event(
     )
 
     stored_alerts = []
+    automatic_incidents = []
 
     for alert in detected_alerts:
-
         db_alert = models.AlertModel(
             event_id=db_event.id,
             rule_name=alert["rule_name"],
@@ -102,6 +137,23 @@ def create_event(
             }
         )
 
+        incident = create_automatic_incident(
+            db_alert,
+            db
+        )
+
+        if incident:
+            automatic_incidents.append(
+                {
+                    "id": incident.id,
+                    "alert_id": incident.alert_id,
+                    "title": incident.title,
+                    "severity": incident.severity,
+                    "status": incident.status,
+                    "created_at": incident.created_at
+                }
+            )
+
     return {
         "message": (
             "Security event stored and analyzed"
@@ -118,7 +170,11 @@ def create_event(
         "alerts_generated": len(
             stored_alerts
         ),
-        "alerts": stored_alerts
+        "alerts": stored_alerts,
+        "incidents_created": len(
+            automatic_incidents
+        ),
+        "incidents": automatic_incidents
     }
 
 
@@ -126,7 +182,6 @@ def create_event(
 def get_events(
     db: Session = Depends(get_db)
 ):
-
     events = (
         db.query(
             models.SecurityEventModel
@@ -148,7 +203,6 @@ def get_event(
     event_id: int,
     db: Session = Depends(get_db)
 ):
-
     event = (
         db.query(
             models.SecurityEventModel
@@ -177,7 +231,6 @@ def get_event(
 def get_alerts(
     db: Session = Depends(get_db)
 ):
-
     alerts = (
         db.query(
             models.AlertModel
@@ -199,7 +252,6 @@ def get_alert(
     alert_id: int,
     db: Session = Depends(get_db)
 ):
-
     alert = (
         db.query(
             models.AlertModel
@@ -229,7 +281,6 @@ def create_incident(
     incident: IncidentCreate,
     db: Session = Depends(get_db)
 ):
-
     alert = (
         db.query(
             models.AlertModel
@@ -288,7 +339,6 @@ def create_incident(
 def get_incidents(
     db: Session = Depends(get_db)
 ):
-
     incidents = (
         db.query(
             models.IncidentModel
@@ -310,7 +360,6 @@ def get_incident(
     incident_id: int,
     db: Session = Depends(get_db)
 ):
-
     incident = (
         db.query(
             models.IncidentModel
@@ -337,7 +386,6 @@ def update_incident_status(
     update: IncidentStatusUpdate,
     db: Session = Depends(get_db)
 ):
-
     incident = (
         db.query(
             models.IncidentModel
@@ -371,7 +419,6 @@ def delete_incident(
     incident_id: int,
     db: Session = Depends(get_db)
 ):
-
     incident = (
         db.query(
             models.IncidentModel
