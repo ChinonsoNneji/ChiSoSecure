@@ -22,3 +22,13 @@ class IncidentStatusUpdate(BaseModel):
         "investigating",
         "resolved"
     ]
+
+
+class ResponseActionCreate(BaseModel):
+    incident_id: int
+    action_type: Literal[
+        "block_ip",
+        "isolate_host",
+        "disable_account"
+    ]
+    target: str

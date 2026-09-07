@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from backend.app import models
 from backend.app.database import Base, SessionLocal, engine
 from backend.app.detection import analyze_event
+from backend.app.response import execute_response_action
 from backend.app.schemas import (
     IncidentCreate,
     IncidentStatusUpdate,
+    ResponseActionCreate,
     SecurityEvent,
 )
 
@@ -18,9 +20,9 @@ app = FastAPI(
     title="ChiSoSecure API",
     description=(
         "Cloud-native security detection and "
-        "incident response platform."
+        "automated incident response platform."
     ),
-    version="0.3.0"
+    version="0.5.0"
 )
 
 
@@ -29,9 +31,44 @@ def get_db():
 
     try:
         yield db
-
     finally:
         db.close()
+
+
+def create_automatic_incident(
+    alert,
+    db: Session
+):
+    if alert.severity not in {
+        "high",
+        "critical"
+    }:
+        return None
+
+    existing_incident = (
+        db.query(models.IncidentModel)
+        .filter(
+            models.IncidentModel.alert_id
+            == alert.id
+        )
+        .first()
+    )
+
+    if existing_incident:
+        return existing_incident
+
+    incident = models.IncidentModel(
+        alert_id=alert.id,
+        title=alert.rule_name,
+        severity=alert.severity,
+        status="open"
+    )
+
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    return incident
 
 
 @app.get("/")
@@ -39,7 +76,7 @@ def root():
     return {
         "service": "ChiSoSecure",
         "status": "operational",
-        "version": "0.3.0"
+        "version": "0.5.0"
     }
 
 
@@ -59,7 +96,6 @@ def create_event(
     event: SecurityEvent,
     db: Session = Depends(get_db)
 ):
-
     db_event = models.SecurityEventModel(
         source_ip=event.source_ip,
         event_type=event.event_type,
@@ -77,9 +113,9 @@ def create_event(
     )
 
     stored_alerts = []
+    automatic_incidents = []
 
     for alert in detected_alerts:
-
         db_alert = models.AlertModel(
             event_id=db_event.id,
             rule_name=alert["rule_name"],
@@ -102,23 +138,36 @@ def create_event(
             }
         )
 
+        incident = create_automatic_incident(
+            db_alert,
+            db
+        )
+
+        if incident:
+            automatic_incidents.append(
+                {
+                    "id": incident.id,
+                    "alert_id": incident.alert_id,
+                    "title": incident.title,
+                    "severity": incident.severity,
+                    "status": incident.status,
+                    "created_at": incident.created_at
+                }
+            )
+
     return {
         "message": (
             "Security event stored and analyzed"
         ),
         "event_id": db_event.id,
-        "event": {
-            "id": db_event.id,
-            "source_ip": db_event.source_ip,
-            "event_type": db_event.event_type,
-            "severity": db_event.severity,
-            "description": db_event.description,
-            "created_at": db_event.created_at
-        },
         "alerts_generated": len(
             stored_alerts
         ),
-        "alerts": stored_alerts
+        "alerts": stored_alerts,
+        "incidents_created": len(
+            automatic_incidents
+        ),
+        "incidents": automatic_incidents
     }
 
 
@@ -126,7 +175,6 @@ def create_event(
 def get_events(
     db: Session = Depends(get_db)
 ):
-
     events = (
         db.query(
             models.SecurityEventModel
@@ -148,7 +196,6 @@ def get_event(
     event_id: int,
     db: Session = Depends(get_db)
 ):
-
     event = (
         db.query(
             models.SecurityEventModel
@@ -177,7 +224,6 @@ def get_event(
 def get_alerts(
     db: Session = Depends(get_db)
 ):
-
     alerts = (
         db.query(
             models.AlertModel
@@ -199,7 +245,6 @@ def get_alert(
     alert_id: int,
     db: Session = Depends(get_db)
 ):
-
     alert = (
         db.query(
             models.AlertModel
@@ -229,7 +274,6 @@ def create_incident(
     incident: IncidentCreate,
     db: Session = Depends(get_db)
 ):
-
     alert = (
         db.query(
             models.AlertModel
@@ -288,7 +332,6 @@ def create_incident(
 def get_incidents(
     db: Session = Depends(get_db)
 ):
-
     incidents = (
         db.query(
             models.IncidentModel
@@ -310,7 +353,6 @@ def get_incident(
     incident_id: int,
     db: Session = Depends(get_db)
 ):
-
     incident = (
         db.query(
             models.IncidentModel
@@ -337,7 +379,6 @@ def update_incident_status(
     update: IncidentStatusUpdate,
     db: Session = Depends(get_db)
 ):
-
     incident = (
         db.query(
             models.IncidentModel
@@ -371,7 +412,6 @@ def delete_incident(
     incident_id: int,
     db: Session = Depends(get_db)
 ):
-
     incident = (
         db.query(
             models.IncidentModel
@@ -396,4 +436,120 @@ def delete_incident(
         "message": (
             f"Incident {incident_id} deleted"
         )
+    }
+
+
+# --------------------------------------------------
+# RESPONSE ACTIONS
+# --------------------------------------------------
+
+@app.post("/response-actions")
+def create_response_action(
+    action: ResponseActionCreate,
+    db: Session = Depends(get_db)
+):
+    incident = (
+        db.query(
+            models.IncidentModel
+        )
+        .filter(
+            models.IncidentModel.id
+            == action.incident_id
+        )
+        .first()
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found"
+        )
+
+    execution = execute_response_action(
+        action.action_type,
+        action.target
+    )
+
+    response_action = (
+        models.ResponseActionModel(
+            incident_id=action.incident_id,
+            action_type=action.action_type,
+            target=action.target,
+            status=execution["status"],
+            result=execution["result"]
+        )
+    )
+
+    db.add(response_action)
+    db.commit()
+    db.refresh(response_action)
+
+    return {
+        "message": "Response action executed",
+        "response_action": response_action
+    }
+
+
+@app.get("/response-actions")
+def get_response_actions(
+    db: Session = Depends(get_db)
+):
+    actions = (
+        db.query(
+            models.ResponseActionModel
+        )
+        .order_by(
+            models.ResponseActionModel.id.desc()
+        )
+        .all()
+    )
+
+    return {
+        "count": len(actions),
+        "response_actions": actions
+    }
+
+
+@app.get(
+    "/incidents/{incident_id}/response-actions"
+)
+def get_incident_response_actions(
+    incident_id: int,
+    db: Session = Depends(get_db)
+):
+    incident = (
+        db.query(
+            models.IncidentModel
+        )
+        .filter(
+            models.IncidentModel.id
+            == incident_id
+        )
+        .first()
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found"
+        )
+
+    actions = (
+        db.query(
+            models.ResponseActionModel
+        )
+        .filter(
+            models.ResponseActionModel.incident_id
+            == incident_id
+        )
+        .order_by(
+            models.ResponseActionModel.id.desc()
+        )
+        .all()
+    )
+
+    return {
+        "incident_id": incident_id,
+        "count": len(actions),
+        "response_actions": actions
     }
