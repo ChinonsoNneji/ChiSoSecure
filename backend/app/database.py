@@ -1,11 +1,21 @@
+import os
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import (
+    declarative_base,
+    sessionmaker,
+)
 
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/chisosecure"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/chisosecure"
+)
 
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL
+)
 
 
 SessionLocal = sessionmaker(
