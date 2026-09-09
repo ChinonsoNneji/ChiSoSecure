@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+)
 from sqlalchemy.orm import Session
 
 from backend.app import models
@@ -6,6 +10,9 @@ from backend.app.dependencies import get_db
 from backend.app.schemas import (
     IncidentCreate,
     IncidentStatusUpdate,
+)
+from backend.app.security import (
+    require_roles,
 )
 
 
@@ -18,12 +25,16 @@ router = APIRouter(
 @router.post("")
 def create_incident(
     incident: IncidentCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst"
+        )
+    )
 ):
     alert = (
-        db.query(
-            models.AlertModel
-        )
+        db.query(models.AlertModel)
         .filter(
             models.AlertModel.id
             == incident.alert_id
@@ -38,9 +49,7 @@ def create_incident(
         )
 
     existing_incident = (
-        db.query(
-            models.IncidentModel
-        )
+        db.query(models.IncidentModel)
         .filter(
             models.IncidentModel.alert_id
             == incident.alert_id
@@ -76,12 +85,17 @@ def create_incident(
 
 @router.get("")
 def get_incidents(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst",
+            "viewer"
+        )
+    )
 ):
     incidents = (
-        db.query(
-            models.IncidentModel
-        )
+        db.query(models.IncidentModel)
         .order_by(
             models.IncidentModel.id.desc()
         )
@@ -97,12 +111,17 @@ def get_incidents(
 @router.get("/{incident_id}")
 def get_incident(
     incident_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst",
+            "viewer"
+        )
+    )
 ):
     incident = (
-        db.query(
-            models.IncidentModel
-        )
+        db.query(models.IncidentModel)
         .filter(
             models.IncidentModel.id
             == incident_id
@@ -123,12 +142,16 @@ def get_incident(
 def update_incident_status(
     incident_id: int,
     update: IncidentStatusUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles(
+            "admin",
+            "analyst"
+        )
+    )
 ):
     incident = (
-        db.query(
-            models.IncidentModel
-        )
+        db.query(models.IncidentModel)
         .filter(
             models.IncidentModel.id
             == incident_id
@@ -156,12 +179,13 @@ def update_incident_status(
 @router.delete("/{incident_id}")
 def delete_incident(
     incident_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(
+        require_roles("admin")
+    )
 ):
     incident = (
-        db.query(
-            models.IncidentModel
-        )
+        db.query(models.IncidentModel)
         .filter(
             models.IncidentModel.id
             == incident_id
