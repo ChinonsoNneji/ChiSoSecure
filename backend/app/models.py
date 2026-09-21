@@ -2,6 +2,7 @@ from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 
 from backend.app.database import Base
+from sqlalchemy import Boolean
 
 
 class SecurityEventModel(Base):
@@ -189,6 +190,19 @@ class UserModel(Base):
         default="viewer"
     )
 
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+class APIKeyModel(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    key_hash = Column(String, unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
